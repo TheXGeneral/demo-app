@@ -2,8 +2,9 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { v4 as uuid } from 'uuid';
 
-import generateData, { type ResourceInterface } from './data';
-import { getSortedList, sleep } from './utils';
+import { type ResourceInterface } from './data';
+import { getSortedList } from './utils';
+import { readFromFile, writeToFile } from './fileInteraction';
 
 const app = express();
 
@@ -20,12 +21,10 @@ app.use(express.json());
 
 app.set('port', process.env.PORT || 8000);
 
-let database = generateData(500);
+let database = readFromFile();
 const DELAY = 1000;
 
 app.get('/api/resources', async (request: Request, response: Response) => {
-	await sleep(DELAY);
-
 	const {
 		filter,
 		limit = 50,
@@ -67,8 +66,6 @@ app.get('/api/resources', async (request: Request, response: Response) => {
 });
 
 app.post('/api/resources', async (request: Request, response: Response) => {
-	await sleep(DELAY);
-
 	const { resource } = request.body;
 
 	if (!resource) {
@@ -91,12 +88,13 @@ app.post('/api/resources', async (request: Request, response: Response) => {
 
 	database.push(newResource);
 
+	writeToFile(database);
+
+
 	response.status(201).json(newResource);
 });
 
 app.put('/api/resources', async (request: Request, response: Response) => {
-	await sleep(DELAY);
-
 	const { resource } = request.body;
 
 	const { id, filteredResourceFields } = resource;
@@ -116,14 +114,15 @@ app.put('/api/resources', async (request: Request, response: Response) => {
 	}
 
 	database[index] = { ...database[index], ...filteredResourceFields };
+
+	writeToFile(database);
+
 	response.status(200).json(database[index]);
 });
 
 app.delete(
 	'/api/resources/one/:id',
 	async (request: Request, response: Response) => {
-		await sleep(DELAY);
-
 		const { id } = request.params;
 		const index = database.findIndex((item) => item.id === id);
 
@@ -133,7 +132,11 @@ app.delete(
 			return;
 		}
 
+		
 		database.splice(index, 1);
+
+		writeToFile(database);
+
 		response.status(200).json({ deletedId: id });
 	}
 );
@@ -141,8 +144,6 @@ app.delete(
 app.delete(
 	'/api/resources/bulk',
 	async (request: Request, response: Response) => {
-		await sleep(2 * DELAY);
-
 		const { ids } = request.body;
 
 		if (!Array.isArray(ids)) {
@@ -162,6 +163,8 @@ app.delete(
 
 			return true;
 		});
+
+		writeToFile(database);
 
 		response.status(200).json({ deletedIds });
 	}
